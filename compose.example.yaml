@@ -1,0 +1,34 @@
+name: local-ai-reference
+services:
+  ollama:
+    image: ${OLLAMA_IMAGE:?Set an evaluated image digest in .env}
+    restart: unless-stopped
+    volumes:
+      - reference_models:/root/.ollama
+    networks: [inference]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${PRIMARY_GPU_ID:?Set the local 3090 GPU UUID}"]
+              capabilities: [gpu]
+  open-webui:
+    image: ${OPEN_WEBUI_IMAGE:?Set an evaluated image digest in .env}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:8080"
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      WEBUI_AUTH: "true"
+      ENABLE_SIGNUP: ${ENABLE_SIGNUP:-false}
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:?Generate a local random secret}
+    volumes:
+      - reference_ui:/app/backend/data
+    networks: [inference]
+    depends_on: [ollama]
+networks:
+  inference:
+volumes:
+  reference_models:
+  reference_ui:
