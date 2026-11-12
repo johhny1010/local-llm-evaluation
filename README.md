@@ -1,6 +1,6 @@
 # Local LLM Evaluation — Seven-GPU AI Lab
 
-Repeatable, task-based evaluation for JT Corbin's Ubuntu inference server: **5 × Tesla P100 16 GB, RTX 3090 24 GB, and RTX 3060 12 GB**. The lab has 116 GB of VRAM distributed across seven devices, not a shared memory pool.
+Repeatable, task-based evaluation for Ubuntu inference server: **5 × Tesla P100 16 GB, RTX 3090 24 GB, and RTX 3060 12 GB**. The lab has 116 GB of VRAM distributed across seven devices, not a shared memory pool.
 
 This project connects local Ollama services to synthetic tests for exact instruction following, structured output, reasoning, information extraction, and security-log triage. It compares task correctness alongside generation speed and request latency, rather than treating faster output as better output.
 
