@@ -1,86 +1,70 @@
-# Heterogeneous Local AI Lab
+# Local LLM Evaluation — Seven-GPU AI Lab
 
-A self-hosted inference lab built around seven NVIDIA GPUs: five Tesla P100s, one RTX 3090, and one RTX 3060. This repository documents workload placement, local model serving, deployment boundaries, and repeatable evaluation on mixed-generation hardware.
+Repeatable, task-based evaluation for JT Corbin's Ubuntu inference server: **5 × Tesla P100 16 GB, RTX 3090 24 GB, and RTX 3060 12 GB**. The lab has 116 GB of VRAM distributed across seven devices, not a shared memory pool.
 
-**Author:** JT Corbin  
-**Status:** Portfolio documentation reconstructed from project records on November 12, 2026. The server is offline for maintenance. This is a sanitized reference repository, not an export of the live server or a claim that the included examples have been deployed there.
+This project connects local Ollama services to synthetic tests for exact instruction following, structured output, reasoning, information extraction, and security-log triage. It compares task correctness alongside generation speed and request latency, rather than treating faster output as better output.
 
-## Hardware
+**Status:** New evaluation tooling authored for the existing lab. Server offline for maintenance at creation; no live scores or speed claims are included. Offline tests validate the harness, not the models or GPU execution.
 
-| Component | Recorded configuration |
-|---|---|
-| Motherboard | Supermicro X9DRX+-F |
-| CPU | 2 × Intel Xeon E5-2680 v2; 20 cores / 40 threads total |
-| Memory | 128 GB ECC DDR3 |
-| Primary inference GPU | RTX 3090, 24 GB |
-| Automation GPU | RTX 3060, 12 GB |
-| Specialist GPU pool | 5 × Tesla P100, 16 GB each |
-| Storage | 1 TB NVMe, PCIe adapter |
-| Operating system | Ubuntu Server; exact current release pending maintenance verification |
+## Server-specific design
 
-The current owner-reported GPU inventory totals **116 GB of distributed VRAM**. This is not a unified memory pool. Older records describe four P100s; the fifth card and its service assignment need an inventory check when the machine returns. No claim is made that a single model can use all memory efficiently.
+| Profile | Hardware | Recorded role | Current evidence |
+|---|---|---|---|
+| `general-3090` | RTX 3090 · 24 GB | General assistant / larger local models | Historical role; reverify service mapping |
+| `automation-3060` | RTX 3060 · 12 GB | Security assistant / automation inference | Historical role; reverify service mapping |
+| `p100-research` | P100 · 16 GB | Research specialist | Historical role; reverify service mapping |
+| `p100-creative` | P100 · 16 GB | Creative specialist | Historical role; reverify service mapping |
+| `p100-developer` | P100 · 16 GB | Developer specialist | Historical role; reverify service mapping |
+| `p100-expert` | P100 · 16 GB | Expert specialist | Historical role; reverify service mapping |
+| `p100-additional` | P100 · 16 GB | Additional capacity | Current owner-reported card; role not yet verified |
 
-## What I built and operated
-
-- Local language-model inference using Ollama, with Docker-hosted Open WebUI.
-- Separate native Ollama service instances for a primary assistant and specialist workloads.
-- A 3090-focused general inference workload, P100 specialist experimentation, and a 3060 security-assistant workload.
-- Model experimentation across Qwen, Llama, Gemma, and DeepSeek families.
-- Python/API automation, browser-agent experiments, and response/performance evaluation.
-
-These are recorded project capabilities. Exact current service mappings, model tags, versions, and continuous GPU execution have not been revalidated. This repository does not contain the private automation implementation or present generated examples as historical production code.
-
-## Architecture
+Recorded host: Supermicro X9DRX+-F, 2 × Xeon E5-2680 v2 (20 cores / 40 threads total), 128 GB ECC DDR3, 1 TB NVMe, Ubuntu Server. Earlier deployment records describe native multi-instance Ollama and Docker-hosted Open WebUI. The harness talks directly to an Ollama API, not the UI. It does not discover or configure your server.
 
 ```mermaid
 flowchart TD
-    U["Local user"] --> W["Open WebUI"]
-    W --> G["General inference service"]
-    W --> S["Specialist inference services"]
-    A["Private automation client"] --> B["Automation inference service"]
-    G --> R["RTX 3090 · 24 GB"]
-    S --> P["5 × P100 · 16 GB each"]
-    B --> C["RTX 3060 · 12 GB"]
+    T["Synthetic task suite"] --> H["Python evaluator"]
+    C["Ignored local configuration"] --> H
+    H --> O["Selected local Ollama service"]
+    O --> G["Configured GPU workload"]
+    H --> S["Deterministic scoring"]
+    S --> R["Sanitized JSON and Markdown reports"]
 ```
 
-This is a logical workload diagram, not a network map. It does not imply that all seven cards are active concurrently or that every P100 has a verified dedicated endpoint.
+## Quick start — no server required
 
-## Engineering decisions
-
-| Decision | Reason and tradeoff |
-|---|---|
-| Separate inference services | Explicit workload ownership and independent model lifecycles; requires resource coordination |
-| Prefer one GPU per fitting workload | Avoid unnecessary cross-card transfers; limits usable model memory per instance |
-| Use P100s selectively | Reuse existing accelerator capacity; requires Pascal-compatible binaries and cooling |
-| Keep inference separate from tool execution | A model response is untrusted input; external actions need independent controls |
-| Publish templates rather than live exports | Demonstrate design without leaking operational configuration |
-
-Ollama may choose GPU placement differently from the logical roles. Verify actual offload and utilization rather than assuming a configured endpoint proves GPU execution.
-
-## Explore the repository
-
-- [Architecture and hardware constraints](docs/architecture.md)
-- [Safe reference deployment](docs/deployment.md)
-- [Security and publication boundaries](SECURITY.md)
-- [Evidence and verification status](docs/evidence.md)
-- [Benchmark methodology](benchmarks/README.md)
-- [Official references](docs/references.md)
-
-## Run the offline checks
-
-Requires Python 3.10+; no third-party Python packages.
+Python 3.10+; no third-party packages.
 
 ```bash
 python -m unittest discover -s tests -v
+python -m evaluator --dry-run
 python scripts/publication_check.py
 ```
 
-The benchmark client is new sample tooling. It sends only a fixed synthetic prompt to a loopback Ollama endpoint and emits aggregate timing/count metadata, not generated text. See its README before running.
+Dry-run lists profiles and case counts. It creates no fabricated scores and makes no network requests.
 
-## Next verification steps
+## Run when the server returns
 
-After maintenance: verify GPU inventory privately, record runtime versions, validate service-to-GPU placement, collect repeatable benchmarks, and review a sanitized demo. No throughput numbers or unverified long-context claims are published as measured results.
+1. Copy `config/local.example.json` to `config/local.json` (ignored by Git).
+2. Set the exact installed model tag and a loopback API endpoint for each profile you intend to evaluate. Leave unused profiles unconfigured. Default ports in examples are generic, not the server's service map.
+3. Verify GPU placement locally. A profile label does not enforce hardware allocation or establish GPU execution.
+4. Run one profile at a time:
 
-## Scope
+```bash
+python -m evaluator --profile general-3090 --runs 3 --output results/general
+python -m evaluator --profile automation-3060 --runs 3 --output results/automation
+python -m evaluator --compare results/general.json results/automation.json --output results/comparison
+```
 
-This project demonstrates local inference operations, heterogeneous GPU planning, API integration, evaluation design, and security-conscious technical documentation. It is an inference lab, not a claim of production availability or large-scale model training. Model weights and third-party software remain subject to their own licenses. No blanket license is assigned to this repository yet.
+Run on the server itself or against a separately established local forwarding endpoint. The client accepts only numeric loopback addresses, disables proxy use and redirects, and does not change access rules. It never scans your network or starts services.
+
+See [methodology](docs/methodology.md), [architecture](docs/architecture.md), [security](SECURITY.md), and [GitHub publishing](docs/publishing.md).
+
+## What this demonstrates
+
+Python API integration, deterministic evaluation, reproducible experimental settings, explicit evidence boundaries, comparative reporting, and operating awareness for mixed-generation local inference hardware.
+
+The suite is a small, transparent diagnostic, not a validated general intelligence benchmark. Security examples are synthetic. Generated content is never executed. Creative quality, real-world analyst performance, long-context limits, and simultaneous seven-GPU throughput are outside the current claims.
+
+## License
+
+MIT for the newly authored repository code and documentation. Model weights, Ollama, Open WebUI, and other dependencies retain their own terms.
